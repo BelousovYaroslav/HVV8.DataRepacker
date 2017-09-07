@@ -64,14 +64,14 @@ public class HVV_DataRepacker {
         String strAMSrootEnvVar = System.getenv( "AMS_ROOT");
         
         //настройка логгера
-        String strlog4jPropertiesFile = strAMSrootEnvVar + "/etc/log4j.logs.repacker.properties";
+        String strlog4jPropertiesFile = strAMSrootEnvVar + "/etc/log4j.data.repacker.properties";
         File file = new File( strlog4jPropertiesFile);
         if(!file.exists())
             System.out.println("It is not possible to load the given log4j properties file :" + file.getAbsolutePath());
         else
             PropertyConfigurator.configure( file.getAbsolutePath());
         
-        logger.info( "Data repacker. v2017.08.30.16-00");
+        logger.info( "Data repacker. v2017.09.07.16-00");
         logger.info( "START");
         
         m_pSettings = new HVV_DataRepackerSettings( strAMSrootEnvVar);
