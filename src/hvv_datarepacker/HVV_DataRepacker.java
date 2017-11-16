@@ -11,6 +11,10 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.ServerSocket;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.Iterator;
@@ -71,7 +75,11 @@ public class HVV_DataRepacker {
         else
             PropertyConfigurator.configure( file.getAbsolutePath());
         
-        logger.info( "Data repacker. v2017.09.07.16-00");
+        logger.info( "");
+        logger.info( "*********************");
+        logger.info( "*********************");
+        logger.info( "*********************");
+        logger.info( "Data repacker. v2017.11.16.16-20");
         logger.info( "START");
         
         m_pSettings = new HVV_DataRepackerSettings( strAMSrootEnvVar);
@@ -219,6 +227,62 @@ public class HVV_DataRepacker {
                 f.delete();
             }
 
+        }
+        
+        logger.info( "");
+        logger.info( "*******");
+        logger.info( "Раскладывание по папкам месяцев старых архивов");
+        
+        for( final File fileEntry : folder.listFiles()) {
+            if( !fileEntry.isDirectory()) {
+                String strFileName = fileEntry.getName();
+                String [] strFileNamePartsDot = strFileName.split( "\\.");
+                if( strFileName.endsWith( ".zip") && strFileNamePartsDot.length == 4) {
+                    String strYear = strFileName.substring(  0, 4);
+                    String strMonth = strFileName.substring( 5, 7);
+                    String strDay = strFileName.substring(   8, 10);
+                    String strDtFolder = strFileName.substring(   0, 7);
+                            
+                    int nYear  = Integer.parseInt( strYear);
+                    int nMonth = Integer.parseInt( strMonth);
+                    int nDay   = Integer.parseInt( strDay);
+
+                    GregorianCalendar dt1 = new GregorianCalendar( nYear, nMonth-1, nDay);
+
+                    long ldt1 = dt1.getTimeInMillis();
+                    long ldtn = GetLocalDate().getTime();
+                    double lLifeLong = (( double) ( ldtn - ldt1)) / 1000. / 3600. / 24.;
+                    
+                    if( lLifeLong >= 60.) {
+                        logger.info( "Имя .zip - файла '" + strFileName + "' содержит 3 точки, и дата, описанная в нём, была более двух месяцев назад (zip-файл достаточно стар). Перемещаем в папку.");
+                        
+                        strDtFolder = strAMSrootEnvVar + "/data/" + strDtFolder;
+                        File f = new File( strDtFolder);
+                        if( !( f.exists() && f.isDirectory())) {
+                            //у нас нет папки-месяца
+                            
+                            //ок. создадим её
+                            try {
+                                f.mkdir();                                    
+                            } catch( Exception ex){
+                                logger.error( ex);
+                            } 
+                        }                        
+                        
+                        //перемещаем файл
+                        try {
+                            Path pathSrc = FileSystems.getDefault().getPath( strAMSrootEnvVar + "/data", strFileName);
+                            Path pathDst = FileSystems.getDefault().getPath( strDtFolder, strFileName);
+                            Files.move( pathSrc, pathDst, StandardCopyOption.REPLACE_EXISTING);
+                        } catch (IOException ex) {
+                            logger.error( ex);
+                        }
+                    }
+                    else {
+                        logger.info( "Имя .zip - файла '" + strFileName + "' содержит 3 точки, НО дата, описанная в нём, была менее двух месяцев назад (zip-файл свеж). Пропускаем.");
+                    }
+                }
+            }
         }
         
         logger.info( "FINISH");
