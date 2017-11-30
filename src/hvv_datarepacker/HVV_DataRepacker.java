@@ -21,6 +21,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.logging.Level;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import javax.swing.JOptionPane;
@@ -79,7 +80,7 @@ public class HVV_DataRepacker {
         logger.info( "*********************");
         logger.info( "*********************");
         logger.info( "*********************");
-        logger.info( "Data repacker. v2017.11.16.16-20");
+        logger.info( "Data repacker. v2017.11.30.11-50");
         logger.info( "START");
         
         m_pSettings = new HVV_DataRepackerSettings( strAMSrootEnvVar);
@@ -231,7 +232,7 @@ public class HVV_DataRepacker {
         
         logger.info( "");
         logger.info( "*******");
-        logger.info( "Раскладывание по папкам месяцев старых архивов");
+        logger.info( "Раскладывание по папкам месяцев старых (более 2х месяцев) архивов");
         
         for( final File fileEntry : folder.listFiles()) {
             if( !fileEntry.isDirectory()) {
@@ -254,7 +255,7 @@ public class HVV_DataRepacker {
                     double lLifeLong = (( double) ( ldtn - ldt1)) / 1000. / 3600. / 24.;
                     
                     if( lLifeLong >= 60.) {
-                        logger.info( "Имя .zip - файла '" + strFileName + "' содержит 3 точки, и дата, описанная в нём, была более двух месяцев назад (zip-файл достаточно стар). Перемещаем в папку.");
+                        logger.info( "Имя .zip - файла '" + strFileName + "' содержит 3 точки, и дата, описанная в нём, была более двух месяцев назад (zip-файл достаточно стар). Перемещаем в папку месяца.");
                         
                         strDtFolder = strAMSrootEnvVar + "/data/" + strDtFolder;
                         File f = new File( strDtFolder);
@@ -271,6 +272,9 @@ public class HVV_DataRepacker {
                         
                         //перемещаем файл
                         try {
+                            logger.debug( strAMSrootEnvVar + "/data/" + strFileName +
+                                            " >>>MOVE>>> " +
+                                            strDtFolder + "/" + strFileName);
                             Path pathSrc = FileSystems.getDefault().getPath( strAMSrootEnvVar + "/data", strFileName);
                             Path pathDst = FileSystems.getDefault().getPath( strDtFolder, strFileName);
                             Files.move( pathSrc, pathDst, StandardCopyOption.REPLACE_EXISTING);
@@ -280,6 +284,79 @@ public class HVV_DataRepacker {
                     }
                     else {
                         logger.info( "Имя .zip - файла '" + strFileName + "' содержит 3 точки, НО дата, описанная в нём, была менее двух месяцев назад (zip-файл свеж). Пропускаем.");
+                    }
+                }
+            }
+        }
+        
+        logger.info( "");
+        logger.info( "*******");
+        logger.info( "Перекладывание по папкам годов папок старых (более полугода) архивов");
+        
+        for( final File dirEntry : folder.listFiles()) {
+            if( dirEntry.isDirectory()) {
+                String strMonthDirName = dirEntry.getName();
+                String [] strFileNamePartsDot = strMonthDirName.split( "\\.");
+                if( strFileNamePartsDot.length == 2) {
+                    String strYear = strMonthDirName.substring(  0, 4);
+                    String strMonth = strMonthDirName.substring( 5, 7);
+                    
+                    String strDstFolder = strMonthDirName.substring(   0, 4);
+                            
+                    int nYear  = Integer.parseInt( strYear);
+                    int nMonth = Integer.parseInt( strMonth);
+
+                    GregorianCalendar dt1 = new GregorianCalendar( nYear, nMonth-1, 1);
+
+                    long ldt1 = dt1.getTimeInMillis();
+                    long ldtn = GetLocalDate().getTime();
+                    double lLifeLong = (( double) ( ldtn - ldt1)) / 1000. / 3600. / 24.;
+                    
+                    if( lLifeLong >= 180.) {
+                        logger.info( "Папка '" + strMonthDirName + "' содержит 1 точку, и дата (год.месяц), описанная в нём, была более полугода назад (папка достаточно старая). Перемещаем в папку года.");
+                        
+                        strDstFolder = strAMSrootEnvVar + "/data/" + strDstFolder;
+                        File f = new File( strDstFolder);
+                        if( !( f.exists() && f.isDirectory())) {
+                            //у нас нет папки-месяца
+                            
+                            //ок. создадим её
+                            try {
+                                f.mkdir();                                    
+                            } catch( Exception ex){
+                                logger.error( ex);
+                            } 
+                        }                        
+                        
+                        //перемещаем содержимое папки
+                        for( final File zpfileEntry : dirEntry.listFiles()) {
+                            String strFileName = zpfileEntry.getName();
+                            try {
+                                logger.debug( strAMSrootEnvVar + "/data/" + strMonthDirName + "/" + strFileName +
+                                            " >>>MOVE>>> " +
+                                            strDstFolder + "/" + strFileName);
+                                Path pathSrc = FileSystems.getDefault().getPath( strAMSrootEnvVar + "/data/" + strMonthDirName, strFileName);
+                                Path pathDst = FileSystems.getDefault().getPath( strDstFolder, strFileName);
+                                Files.move( pathSrc, pathDst, StandardCopyOption.REPLACE_EXISTING);
+                                
+                            } catch (IOException ex) {
+                                logger.error( ex);
+                            }
+                        }
+                        
+                        
+                    }
+                    else {
+                        logger.info( "Имя папки '" + strMonthDirName + "' содержит точку, НО дата, описанная в нём, была менее двух месяцев назад (папка свежая). Пропускаем.");
+                    }
+                }
+                
+                if( dirEntry.list().length == 0) {
+                    logger.info( "Папка '" + strMonthDirName + "' пустая. Стираем её.");
+                    try {
+                        Files.delete( FileSystems.getDefault().getPath( strAMSrootEnvVar + "/data/" + strMonthDirName));
+                    } catch( IOException ex) {
+                        logger.info( "IOException отловлена при попытке удалить пустую папку месяца.", ex);
                     }
                 }
             }
